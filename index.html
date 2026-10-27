@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ht">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZBL FOOTBALL PRONOSTIC</title>
+    <style>
+        :root {
+            --primary: #1e3d59;
+            --secondary: #17b978;
+            --background: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #333333;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background);
+            margin: 0;
+            padding: 20px;
+            color: var(--text);
+        }
+        header {
+            text-align: center;
+            padding: 20px 0;
+            background: var(--primary);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        h1 { margin: 0; font-size: 2rem; }
+        .container { max-width: 700px; margin: 0 auto; }
+        #loading { text-align: center; font-size: 1.2rem; padding: 40px; color: var(--primary); }
+        .match-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .match-info { text-align: center; font-size: 0.85rem; color: #777; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .match-teams { display: flex; justify-content: space-between; align-items: center; }
+        .team { width: 35%; font-weight: 600; font-size: 1.1rem; }
+        .team.home { text-align: right; }
+        .team.away { text-align: left; }
+        .inputs-container { display: flex; align-items: center; justify-content: center; gap: 10px; width: 30%; }
+        .score-input { width: 45px; height: 45px; font-size: 1.2rem; text-align: center; border: 2px solid #ddd; border-radius: 8px; }
+        .vs { font-weight: bold; color: #aaa; }
+        .btn-submit {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .notification { display: none; background-color: #d4edda; color: #155724; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>ZBL FOOTBALL PRONOSTIC</h1>
+            <p style="margin:5px 0 0 0; opacity:0.8;">Mete pwonostik ou yo an dirèk</p>
+        </header>
+
+        <div id="notification" class="notification"></div>
+        <div id="loading">Ap chaje pwochen match yo...</div>
+        <div id="matchs-list"></div>
+    </div>
+
+    <script>
+        // 🔑 METE KLE API OU A LA ANBA A
+        const API_KEY = "METE_KLE_API_OU_A_LA"; 
+        const LEAGUE_ID = 61; // 61 = Ligue 1 (Frans)
+        const SEASON = 2026;  
+
+        let currentMatchs = [];
+
+        async function loadData() {
+            const url = `https://api-sports.io{LEAGUE_ID}&season=${SEASON}&next=10`;
+            
+            try {
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: {
+                        "x-rapidapi-key": API_KEY,
+                        "x-rapidapi-host": "v3.football.api-sports.io"
+                    }
+                });
+                
+                const data = await response.json();
+                document.getElementById('loading').style.display = 'none';
+                        
+              9c9affef0bbb40fc8a3cf4f0882e4e53
+                    currentMatchs = data.response;
+                    renderMatchs(data.response);
+                } else {
+                    document.getElementById('matchs-list').innerHTML = "<p style='text-align:center;'>Pa gen match ki disponib pou kounye a.</p>";
+                }
+            } catch (error) {
+                console.error(error);
+                document.getElementById('loading').innerHTML = "Erreur de connexion avèk API Football la.";
+            }
+        }
+
+        function renderMatchs(matchs) {
+            const listContainer = document.getElementById('matchs-list');
+            listContainer.innerHTML = ""; 
+
+            const savedPronos = JSON.parse(localStorage.getItem('zbl_pronos')) || {};
+
+            matchs.forEach((item) => {
+                const fixtureId = item.fixture.id;
+                const homeTeam = item.teams.home.name;
+                const awayTeam = item.teams.away.name;
+                
+                const matchDate = new Date(item.fixture.date).toLocaleString('fr-FR', {
+                    weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
+                });
+
+                const savedHomeScore = savedPronos[`home-${fixtureId}`] || "";
+                const savedAwayScore = savedPronos[`away-${fixtureId}`] || "";
+
+                const cardHtml = `
+                    <div class="match-card">
+                        <div class="match-info">${matchDate}</div>
+                        <div class="match-teams">
+                            <span class="team home">${homeTeam}</span>
+                            <div class="inputs-container">
+                                <input type="number" class="score-input" id="home-${fixtureId}" min="0" value="${savedHomeScore}" placeholder="-">
+                                <span class="vs">VS</span>
+                                <input type="number" class="score-input" id="away-${fixtureId}" min="0" value="${savedAwayScore}" placeholder="-">
+                            </div>
+                            <span class="team away">${awayTeam}</span>
+                        </div>
+                    </div>
+                `;
+                listContainer.innerHTML += cardHtml;
+            });
+
+            if(matchs.length > 0) {
+                listContainer.innerHTML += `<button class="btn-submit" onclick="savePronostics()">Anrejistre Pwonostik Mwen Yo</button>`;
+            }
+        }
+
+        function savePronostics() {
+            const pronosToSave = {};
+            
+            currentMatchs.forEach(item => {
+                const id = item.fixture.id;
+                const homeVal = document.getElementById(`home-${id}`).value;
+                const awayVal = document.getElementById(`away-${id}`).value;
+
+                if(homeVal !== "" && awayVal !== "") {
+                    pronosToSave[`home-${id}`] = homeVal;
+                    pronosToSave[`away-${id}`] = awayVal;
+                }
+            });
+
+            localStorage.setItem('zbl_pronos', JSON.stringify(pronosToSave));
+
+            const notif = document.getElementById('notification');
+            notif.innerText = "⚽ Pwonostik ou yo anrejistre byen pwòp nan navigatè a !";
+            notif.style.display = "block";
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            setTimeout(() => { notif.style.display = "none"; }, 4000);
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
